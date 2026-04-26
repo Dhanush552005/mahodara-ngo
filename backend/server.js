@@ -9,6 +9,9 @@ app.use(express.json());
 
 app.use("/api/contact", require("./routes/contact"));
 //app.use("/api/payment", require("./routes/payment"));
+app.get("/", (req, res) => {
+  res.send("Mahodara NGO Backend API is running successfully.");
+});
 
 app.listen(process.env.PORT, () => {
   console.log("Server running on port " + process.env.PORT);

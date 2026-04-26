@@ -1,344 +1,262 @@
-import { useState, useEffect } from 'react';
+import { useState } from "react";
+import { Heart, ShoppingCart, Lock } from "lucide-react";
 
 function Donate() {
-  const [donationType, setDonationType] = useState('');
-  const [amount, setAmount] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [date, setDate] = useState('');
-  const [location, setLocation] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [showPopup, setShowPopup] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState(500);
+  const [customAmount, setCustomAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  // Set minimum date to today
-  const today = new Date().toISOString().split('T')[0];
+  const finalAmount = customAmount ? Number(customAmount) : amount;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-    if (!phone.trim() || !/^\d{10}$/.test(phone)) {
-      setError('Please enter a valid 10-digit phone number');
-      return;
-    }
-    if (!date) {
-      setError('Please select a date');
-      return;
-    }
-    if (!location.trim()) {
-      setError('Please enter a location');
-      return;
-    }
-    if (!donationType) {
-      setError('Please select a donation type');
-      return;
-    }
-    if (donationType === 'money' && !amount) {
-      setError('Please select a donation amount');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await fetch('http://localhost:5000/api/donations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          phone,
-          date,
-          location,
-          donationType,
-          amount: donationType === 'money' ? Number(amount) : undefined,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit donation');
-      }
-
-      setSuccess('Thank you! Your donation has been submitted successfully.');
-      setShowPopup(true);
-      setName('');
-      setPhone('');
-      setDate('');
-      setLocation('');
-      setDonationType('');
-      setAmount('');
-    } catch (error) {
-      setError(error.message || 'Server error, please try again later');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
   };
 
-  // Hide popup after 2 seconds
-  useEffect(() => {
-    if (showPopup) {
-      const timer = setTimeout(() => {
-        setShowPopup(false);
-      }, 2000);
-      return () => clearTimeout(timer);
+  const handleDonate = async (e) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      setMessage("Please enter your name.");
+      return;
     }
-  }, [showPopup]);
+
+    if (!phone.trim() || phone.length !== 10) {
+      setMessage("Please enter valid phone number.");
+      return;
+    }
+
+    if (!finalAmount || finalAmount < 1) {
+      setMessage("Please enter valid amount.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    const loaded = await loadRazorpayScript();
+
+    if (!loaded) {
+      setMessage("Failed to load payment gateway.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/payment/create-order",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount: finalAmount,
+          }),
+        }
+      );
+
+      const order = await response.json();
+
+      const options = {
+        key: "YOUR_RAZORPAY_KEY_ID",
+        amount: order.amount,
+        currency: "INR",
+        name: "Mahodara NGO",
+        description: "Support Our Cause",
+        order_id: order.id,
+        handler: function () {
+          setMessage("Thank you for your donation ❤️");
+          setName("");
+          setPhone("");
+          setCustomAmount("");
+          setAmount(500);
+        },
+        prefill: {
+          name,
+          contact: phone,
+        },
+        theme: {
+          color: "#004B8D",
+        },
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+    } catch (error) {
+      setMessage("Payment failed. Please try again.");
+    }
+
+    setLoading(false);
+  };
+
+  const amountButtons = [100, 250, 500, 1000];
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-gray-200 p-4 sm:p-6">
-      {/* Main Content with Conditional Blur */}
-      <div className={`w-full max-w-2xl transition-all duration-300 ${showPopup ? 'filter blur-sm' : ''}`}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 m-2">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-8">
-            Support Our Cause
-          </h2>
+    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 px-4 py-8 sm:px-6 sm:py-12 md:py-16">
+      <div className="max-w-2xl mx-auto">
+        {/* Header Section */}
+        <div className="text-center mb-8 sm:mb-12">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <Heart className="w-8 h-8 sm:w-10 sm:h-10 text-red-500" />
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#004B8D]">
+              Donate to Mahodara NGO
+            </h1>
+          </div>
+          <p className="text-base sm:text-lg text-gray-600">
+            Your generous donation helps us create real change in the community.
+          </p>
+        </div>
 
-          {error && (
-            <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6 text-sm text-center">
-              {error}
+        {/* Main Card */}
+        <div className="bg-white rounded-lg sm:rounded-2xl shadow-lg p-6 sm:p-8 md:p-10 space-y-6 sm:space-y-8">
+          {/* Message Alert */}
+          {message && (
+            <div className={`p-4 sm:p-5 rounded-lg text-sm sm:text-base font-medium ${
+              message.includes('Thank you') 
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}>
+              {message}
             </div>
           )}
-          {success && !showPopup && (
-            <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6 text-sm text-center">
-              {success}
-            </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Name Field */}
+          <form onSubmit={handleDonate} className="space-y-5 sm:space-y-6">
+            {/* Name Input - Mobile Optimized */}
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Full Name
+              <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-2 sm:mb-3">
+                Full Name <span className="text-red-500">*</span>
               </label>
               <input
-                id="name"
                 type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError('');
-                  setSuccess('');
-                }}
                 placeholder="Enter your full name"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
-                required
-                aria-describedby="nameHelp"
+                className="w-full text-base sm:text-lg px-4 sm:px-5 py-3 sm:py-4 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004B8D] focus:border-transparent transition-all duration-200 bg-white"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
-              <p id="nameHelp" className="text-xs text-gray-500 mt-1">
-                Your name helps us acknowledge your contribution.
-              </p>
             </div>
 
-            {/* Phone Number Field */}
+            {/* Phone Input - Mobile Optimized */}
             <div>
-              <label
-                htmlFor="phone"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Phone Number
+              <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-2 sm:mb-3">
+                Phone Number <span className="text-red-500">*</span>
               </label>
               <input
-                id="phone"
                 type="tel"
+                placeholder="10-digit phone number"
+                className="w-full text-base sm:text-lg px-4 sm:px-5 py-3 sm:py-4 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004B8D] focus:border-transparent transition-all duration-200 bg-white"
                 value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setError('');
-                  setSuccess('');
-                }}
-                placeholder="Enter your 10-digit phone number"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
-                required
-                pattern="\d{10}"
-                aria-describedby="phoneHelp"
+                onChange={(e) => setPhone(e.target.value)}
               />
-              <p id="phoneHelp" className="text-xs text-gray-500 mt-1">
-                We’ll use this to contact you if needed.
-              </p>
-            </div>
-
-            {/* Date Field */}
-            <div>
-              <label
-                htmlFor="date"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Donation Date
-              </label>
-              <input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  setError('');
-                  setSuccess('');
-                }}
-                min={today}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700 appearance-none"
-                required
-                aria-describedby="dateHelp"
-              />
-              <p id="dateHelp" className="text-xs text-gray-500 mt-1">
-                Select a date starting from today.
-              </p>
-            </div>
-
-            {/* Location Field */}
-            <div>
-              <label
-                htmlFor="location"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Location
-              </label>
-              <input
-                id="location"
-                type="text"
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setError('');
-                  setSuccess('');
-                }}
-                placeholder="Enter your city or location"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
-                required
-                aria-describedby="locationHelp"
-              />
-              <p id="locationHelp" className="text-xs text-gray-500 mt-1">
-                Where are you donating from?
-              </p>
-            </div>
-
-            {/* Donation Type Selection */}
-            <div>
-              <label
-                htmlFor="donationType"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                What would you like to donate?
-              </label>
-              <select
-                id="donationType"
-                value={donationType}
-                onChange={(e) => {
-                  setDonationType(e.target.value);
-                  setError('');
-                  setSuccess('');
-                }}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
-                required
-                aria-describedby="donationTypeHelp"
-              >
-                <option value="" disabled>
-                  Select donation type
-                </option>
-                <option value="food">Food</option>
-                <option value="clothing">Clothing</option>
-                <option value="money">Money</option>
-                <option value="education">Educational Supplies</option>
-                <option value="medical">Medical Supplies</option>
-              </select>
-              <p id="donationTypeHelp" className="text-xs text-gray-500 mt-1">
-                Choose the type of donation to support those in need.
-              </p>
             </div>
 
             {/* Amount Selection */}
-            {donationType === 'money' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Donation Amount
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                  {[100, 250, 500, 1000].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => {
-                        setAmount(value);
-                        setError('');
-                        setSuccess('');
-                      }}
-                      className={`py-2 px-4 border rounded-lg text-sm font-medium transition-colors ${
-                        amount === value
-                          ? 'bg-[#004B8D] text-white border-[#004B8D]'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-[#FFDE73] hover:text-gray-800'
-                      }`}
-                    >
-                      ₹{value}
-                    </button>
-                  ))}
-                </div>
-                <p id="amountHelp" className="text-xs text-gray-500 mt-1">
-                  Select an amount to contribute.
-                </p>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-3 sm:mb-4">
+                Donation Amount <span className="text-red-500">*</span>
+              </label>
 
-            {/* Submit Button */}
+              {/* Preset Amount Buttons - Mobile Optimized with Large Touch Targets */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                {amountButtons.map((value) => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => {
+                      setAmount(value);
+                      setCustomAmount("");
+                    }}
+                    className={`py-3 sm:py-4 px-3 sm:px-4 rounded-lg sm:rounded-xl border-2 font-bold text-base sm:text-lg transition-all duration-200 active:scale-95 ${
+                      amount === value && !customAmount
+                        ? "bg-[#004B8D] text-white border-[#004B8D] shadow-md"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-[#004B8D]"
+                    }`}
+                  >
+                    ₹{value}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Amount Input */}
+              <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2 sm:mb-3">
+                Or enter custom amount
+              </label>
+              <input
+                type="number"
+                placeholder="Enter custom amount"
+                className="w-full text-base sm:text-lg px-4 sm:px-5 py-3 sm:py-4 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004B8D] focus:border-transparent transition-all duration-200 bg-white"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+              />
+            </div>
+
+            {/* Summary Section */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6 rounded-lg sm:rounded-xl border border-blue-200">
+              <div className="flex justify-between items-center mb-2 sm:mb-3">
+                <span className="text-sm sm:text-base text-gray-600">Total Donation:</span>
+                <span className="text-2xl sm:text-3xl font-bold text-[#004B8D]">₹{finalAmount}</span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-500">Your contribution will directly help those in need.</p>
+            </div>
+
+            {/* Security Badge */}
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 justify-center bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+              <span>Secure payment via Razorpay</span>
+            </div>
+
+            {/* Submit Button - Fixed at Bottom on Mobile */}
             <button
               type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-3 rounded-lg text-white font-medium text-lg transition-all duration-300 ${
-                isSubmitting
-                  ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-[#004B8D] hover:bg-[#FFDE73] hover:text-gray-800'
-              }`}
+              disabled={loading}
+              className="w-full bg-[#004B8D] hover:bg-[#003A68] text-white py-4 sm:py-5 px-6 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg active:scale-95 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="animate-spin h-5 w-5 mr-2 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                  Processing...
-                </span>
+              {loading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Processing Payment...
+                </>
               ) : (
-                'Donate Now'
+                <>
+                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
+                  Proceed to Payment
+                </>
               )}
             </button>
           </form>
-        </div>
-      </div>
 
-      {/* Popup */}
-      {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-[#004B8D] text-white p-6 rounded-lg shadow-2xl text-center animate-fade-in">
-            <h3 className="text-xl font-bold">Thank You For Donating To Us</h3>
+          {/* Trust Section */}
+          <div className="pt-4 sm:pt-6 border-t border-gray-200">
+            <p className="text-xs sm:text-sm text-gray-600 text-center">
+              <span className="font-semibold">100% Secure</span> • Payments encrypted • No spam • Every donation counts
+            </p>
           </div>
         </div>
-      )}
+
+        {/* Impact Section */}
+        <div className="mt-8 sm:mt-12 grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-md text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-[#004B8D] mb-2">500+</div>
+            <p className="text-xs sm:text-sm text-gray-600">Families Helped</p>
+          </div>
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-md text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-[#004B8D] mb-2">10K+</div>
+            <p className="text-xs sm:text-sm text-gray-600">Children Supported</p>
+          </div>
+          <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-md text-center col-span-2 md:col-span-1">
+            <div className="text-2xl sm:text-3xl font-bold text-[#004B8D] mb-2">50+</div>
+            <p className="text-xs sm:text-sm text-gray-600">Active NGOs</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

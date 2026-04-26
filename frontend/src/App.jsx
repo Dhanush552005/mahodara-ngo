@@ -12,16 +12,19 @@ function App() {
   return (
     <>
       <Router>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/" element={<Navbar />} />
-          <Route path="/" element={<Footer />} />
-          <Route path="/Contact" element={<Contact />} />
-          <Route path="/Donate" element={<Donate />} />
-          <Route path="/Event" element={<Event />} />
-        </Routes>
-        <Footer />
+        <div className="flex flex-col min-h-screen w-full">
+          <Navbar />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/Contact" element={<Contact />} />
+              <Route path="/donate" element={<Donate />} />
+              <Route path="/event" element={<Event />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
       </Router>
     </>
   );
